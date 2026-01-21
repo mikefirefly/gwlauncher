@@ -2,6 +2,7 @@
 using GW_Launcher.Guildwars;
 using Octokit;
 using System.IO;
+using System.Security.Cryptography.Pkcs;
 using Account = GW_Launcher.Classes.Account;
 using Application = System.Windows.Forms.Application;
 using Assembly = System.Reflection.Assembly;
@@ -675,7 +676,7 @@ internal static class Program
                 return;
             }
 
-            var latestSize = response.Value.SizeDecompressed;
+            var latestFileId = response.Value.FileId;
             var accsToUpdate = new List<Account>();
             var accsChecked = new List<Account>();
 
@@ -688,23 +689,37 @@ internal static class Program
                     continue;
                 }
 
-                // Get file size
-                long currentSize;
-                try
+                accsChecked.Add(account);
+                if (GuildWarsExecutableParser.TryParse(account.gwpath) is not GuildWarsExecutableParser parser)
                 {
-                    var fileInfo = new FileInfo(account.gwpath);
-                    currentSize = fileInfo.Length;
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error getting file size for {account.gwpath}: {ex.Message}");
+                    Console.WriteLine($"Failed to parse Guild Wars executable at {account.gwpath}");
                     continue;
                 }
 
-                accsChecked.Add(account);
-                if (currentSize == latestSize)
+                try
                 {
-                    continue;
+                    var currentFileId = await parser.GetFileId(CancellationToken.None);
+                    if (currentFileId == latestFileId)
+                    {
+                        continue;
+                    }
+                }
+                catch(Exception e)
+                {
+                    try
+                    {
+                        var currentFileId = await parser.GetVersionLegacy(CancellationToken.None);
+                        if (currentFileId == latestFileId)
+                        {
+                            continue;
+                        }
+                    }
+                    catch(Exception e2)
+                    {
+                        var exWrapper = new AggregateException(e, e2);
+                        Console.WriteLine($"Error checking version for {account.gwpath}: {exWrapper}");
+                        continue;
+                    }
                 }
 
                 accsToUpdate.Add(account);
