@@ -2,7 +2,6 @@
 using GW_Launcher.Guildwars;
 using Octokit;
 using System.IO;
-using System.Security.Cryptography.Pkcs;
 using Account = GW_Launcher.Classes.Account;
 using Application = System.Windows.Forms.Application;
 using Assembly = System.Reflection.Assembly;
@@ -43,22 +42,13 @@ internal static class Program
 
 	public static string? GetProcessPath(Process process)
     {
-        try
-        {
-            if (process.HasExited)
-                return default;
+		
+		var fileNameBuilder = new StringBuilder(1024);
+        var bufferLength = (uint)fileNameBuilder.Capacity + 1;
+        return QueryFullProcessImageName(process.Handle, 0, fileNameBuilder, ref bufferLength) ?
+            fileNameBuilder.ToString() :
+            null;
 
-            var fileNameBuilder = new StringBuilder(1024);
-            var bufferLength = (uint)fileNameBuilder.Capacity + 1;
-            return QueryFullProcessImageName(process.Handle, 0, fileNameBuilder, ref bufferLength) ?
-                fileNameBuilder.ToString() :
-                null;
-        }
-		catch(InvalidOperationException)
-        {
-            // Process has exited in between the check and the query
-            return default;
-        }    
     }
 
 	static bool IsProcessOpen(string name)
@@ -268,7 +258,7 @@ internal static class Program
         {
             Task.Run(CheckGitHubNewerVersion);
             Task.Run(CheckGitHubGModVersion);
-            Task.Run(CheckForGwExeUpdates);
+            Task.Run(async () => await CheckForGwExeUpdates(false));
         }
 
         settings.Save();
@@ -662,7 +652,7 @@ internal static class Program
         await using var fs = new FileStream(gmod, FileMode.Create);
         await s.CopyToAsync(fs);
     }
-    public static async Task CheckForGwExeUpdates()
+    public static async Task CheckForGwExeUpdates(bool messageIfUpToDate)
     {
         try
         {
@@ -676,7 +666,7 @@ internal static class Program
                 return;
             }
 
-            var latestFileId = response.Value.FileId;
+            var latestSize = response.Value.SizeDecompressed;
             var accsToUpdate = new List<Account>();
             var accsChecked = new List<Account>();
 
@@ -689,43 +679,29 @@ internal static class Program
                     continue;
                 }
 
-                accsChecked.Add(account);
-                if (GuildWarsExecutableParser.TryParse(account.gwpath) is not GuildWarsExecutableParser parser)
+                // Get file size
+                long currentSize;
+                try
                 {
-                    Console.WriteLine($"Failed to parse Guild Wars executable at {account.gwpath}");
+                    var fileInfo = new FileInfo(account.gwpath);
+                    currentSize = fileInfo.Length;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error getting file size for {account.gwpath}: {ex.Message}");
                     continue;
                 }
 
-                try
+                accsChecked.Add(account);
+                if (currentSize == latestSize)
                 {
-                    var currentFileId = await parser.GetFileId(CancellationToken.None);
-                    if (currentFileId == latestFileId)
-                    {
-                        continue;
-                    }
-                }
-                catch(Exception e)
-                {
-                    try
-                    {
-                        var currentFileId = await parser.GetVersionLegacy(CancellationToken.None);
-                        if (currentFileId == latestFileId)
-                        {
-                            continue;
-                        }
-                    }
-                    catch(Exception e2)
-                    {
-                        var exWrapper = new AggregateException(e, e2);
-                        Console.WriteLine($"Error checking version for {account.gwpath}: {exWrapper}");
-                        continue;
-                    }
+                    continue;
                 }
 
                 accsToUpdate.Add(account);
             }
 
-            if (accsToUpdate.Count == 0)
+            if (accsToUpdate.Count == 0 && messageIfUpToDate)
             {
                 MessageBox.Show($"No accounts are out of date.", "GW Update");
                 return;

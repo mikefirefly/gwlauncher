@@ -435,7 +435,7 @@ public partial class MainForm : Form
     private async void ToolStripMenuItemUpdateAllClients_Click(object sender, EventArgs e)
     {
         AdminAccess.RestartAsAdminPrompt(true);
-        await Program.CheckForGwExeUpdates();
+        await Program.CheckForGwExeUpdates(true);
 
 		//var clients = Program.accounts.ToList();
 
