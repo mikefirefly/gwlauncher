@@ -701,9 +701,13 @@ internal static class Program
                 accsToUpdate.Add(account);
             }
 
-            if (accsToUpdate.Count == 0 && messageIfUpToDate)
+            if (accsToUpdate.Count == 0)
             {
-                MessageBox.Show($"No accounts are out of date.", "GW Update");
+                if (messageIfUpToDate)
+                {
+                    MessageBox.Show($"No accounts are out of date.", "GW Update");
+                }
+
                 return;
             }
             var accNames = string.Join(',', accsToUpdate.Select(acc => acc.Name));
