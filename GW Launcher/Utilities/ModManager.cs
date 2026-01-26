@@ -102,7 +102,10 @@ public class ModManager
             var found = dllsToLoad.Find(str => str.EndsWith("gMod.dll", StringComparison.OrdinalIgnoreCase));
             if (found == null)
             {
-                var gmod = Path.Combine(Directory.GetCurrentDirectory(), "gMod.dll");
+                var baseDirectory = AppContext.BaseDirectory;
+                var gmod = Path.Combine(baseDirectory, "gMod.dll");
+                if (!File.Exists(gmod))
+                    gmod = Path.Combine(Directory.GetCurrentDirectory(), "gMod.dll");
                 if (!File.Exists(gmod))
                 {
                     MessageBox.Show(
