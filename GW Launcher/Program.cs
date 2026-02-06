@@ -163,9 +163,17 @@ internal static class Program
 		}
 		if (memory == null)
 		{
-			if (IsProcessOpen(account.gwpath))
-				return "The Guild Wars executable at " + account.gwpath + " is already running";
-			var res = MulticlientPatch.LaunchClient(account, out memory);
+            try
+            {
+                if (IsProcessOpen(account.gwpath))
+                    return "The Guild Wars executable at " + account.gwpath + " is already running";
+            }
+            catch (Exception ex)
+            {
+                return ex.Message;
+            }
+
+            var res = MulticlientPatch.LaunchClient(account, out memory);
 			if (res != null)
 				return res;
 		}
